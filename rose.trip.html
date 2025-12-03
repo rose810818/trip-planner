@@ -13,7 +13,7 @@
             font-family: Arial, sans-serif;
             height: 100%;
         }
-        /* 核心結構：使用 Flexbox 劃分控制面板和地圖 */
+        /* 主容器：使用 Flexbox 劃分控制面板和地圖 */
         #container {
             display: flex;
             height: 100vh; /* 確保容器佔滿整個視窗高度 */
@@ -29,15 +29,60 @@
             flex-grow: 1; /* 讓地圖佔據剩餘所有空間 */
             height: 100%;
         }
-        /* 介面樣式 - 保持簡潔 */
-        input[type="text"], select { width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-        button { padding: 8px 12px; margin-left: 5px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; }
-        .add-button { background-color: #4CAF50; color: white; width: 100%; margin-left: 0; margin-bottom: 15px; }
-        .waypoint-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #e0e0e0; }
-        .waypoint-item span { font-weight: 600; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        #results { margin-top: 15px; padding: 10px; border: 1px solid #ccc; background-color: #fff; border-radius: 4px; }
-        .edit-controls { padding: 10px 0; border-top: 1px solid #ddd; margin-top: 10px; width: 100%; }
-        .edit-controls button { margin: 2px; }
+        /* 介面樣式 */
+        input[type="text"], select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 8px 12px;
+            margin-left: 5px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .add-button {
+            background-color: #4CAF50;
+            color: white;
+            width: 100%;
+            margin-left: 0;
+            margin-bottom: 15px;
+        }
+        .waypoint-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px dashed #e0e0e0;
+        }
+        .waypoint-item span {
+            font-weight: 600;
+            max-width: 60%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        #results {
+            margin-top: 15px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            border-radius: 4px;
+        }
+        .edit-controls {
+            padding: 10px 0;
+            border-top: 1px solid #ddd;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .edit-controls button {
+            margin: 2px;
+        }
     </style>
 </head>
 <body>
@@ -84,14 +129,21 @@
     
     <script>
         // 全域變數
-        let map, directionsService, directionsRenderer, autocomplete;
-        let waypoints = [], waypointIdCounter = 0, selectedPlace = null, editingWaypointId = null;
+        let map;
+        let directionsService;
+        let directionsRenderer;
+        let autocomplete;
+        let waypoints = [];             
+        let waypointIdCounter = 0;      
+        let selectedPlace = null;       
+        let editingWaypointId = null;   
 
         // =================================================================
         // 核心功能：初始化與資料管理
         // =================================================================
         
         function initMap() {
+            // 台灣中心座標
             const taiwan = { lat: 23.6978, lng: 120.9605 }; 
             
             map = new google.maps.Map(document.getElementById('map'), {
@@ -103,7 +155,9 @@
             // 允許使用者拖曳地圖上的路線
             directionsRenderer = new google.maps.DirectionsRenderer({ map: map, suppressMarkers: false, draggable: true });
             
-            directionsRenderer.addListener("directions_changed", () => { console.log("路線已被拖曳改變。"); });
+            directionsRenderer.addListener("directions_changed", () => {
+                console.log("路線已被拖曳改變。");
+            });
 
             const input = document.getElementById('place-input');
             autocomplete = new google.maps.places.Autocomplete(input);
@@ -113,7 +167,9 @@
             loadWaypoints();
         }
         
-        function onPlaceChanged() { selectedPlace = autocomplete.getPlace(); }
+        function onPlaceChanged() {
+            selectedPlace = autocomplete.getPlace();
+        }
 
         function loadWaypoints() {
             try {
@@ -129,16 +185,22 @@
                         location: new google.maps.LatLng(wp.location.lat, wp.location.lng) 
                     }));
                     
-                    if (savedIdCounter) { waypointIdCounter = parseInt(savedIdCounter) + 1; }
+                    if (savedIdCounter) {
+                        waypointIdCounter = parseInt(savedIdCounter) + 1;
+                    }
 
                     updateWaypointsList();
                     calculateRoute(); 
                 }
-            } catch (e) { console.warn("未找到儲存的行程資料或資料損毀。"); }
+
+            } catch (e) {
+                console.warn("未找到儲存的行程資料或資料損毀。");
+            }
         }
         
         function saveWaypoints() {
             try {
+                // 將 LatLng 物件轉換為純粹的 { lat, lng } 以便儲存
                 const dataToSave = waypoints.map(wp => ({
                     id: wp.id,
                     name: wp.name,
@@ -147,7 +209,9 @@
 
                 localStorage.setItem('plannerWaypoints', JSON.stringify(dataToSave));
                 localStorage.setItem('plannerIdCounter', waypointIdCounter.toString());
-            } catch (e) { console.error("無法儲存到 Local Storage:", e); }
+            } catch (e) {
+                console.error("無法儲存到 Local Storage:", e);
+            }
         }
 
         // =================================================================
@@ -155,7 +219,10 @@
         // =================================================================
 
         function addWaypoint() {
-            if (!selectedPlace || !selectedPlace.geometry) { alert("請從建議清單中選擇一個有效地點！"); return; }
+            if (!selectedPlace || !selectedPlace.geometry) {
+                alert("請從建議清單中選擇一個有效地點！");
+                return;
+            }
             
             const newWaypoint = {
                 id: waypointIdCounter++,
@@ -169,17 +236,22 @@
             selectedPlace = null;
 
             saveWaypoints();
-            // 修正：先計算路線，讓路線優化後再更新列表
-            calculateRoute(); 
+            updateWaypointsList();
+            calculateRoute();
         }
 
         function deleteWaypoint(id) {
             waypoints = waypoints.filter(wp => wp.id !== id);
-            saveWaypoints(); updateWaypointsList(); calculateRoute();
+            
+            saveWaypoints();
+            updateWaypointsList();
+            calculateRoute();
         }
 
         function editWaypoint(id) {
-            editingWaypointId = id; updateWaypointsList();
+            editingWaypointId = id;
+            updateWaypointsList();
+            
             const editInput = document.getElementById('edit-place-input');
             if (editInput) {
                 editInput.focus();
@@ -191,23 +263,37 @@
 
         function cancelEdit() {
             editingWaypointId = null;
+            
+            // 確保 Autocomplete 綁定回主要輸入框
             const mainInput = document.getElementById('place-input');
             autocomplete = new google.maps.places.Autocomplete(mainInput);
             autocomplete.addListener('place_changed', onPlaceChanged);
             selectedPlace = null; 
+            
             updateWaypointsList();
         }
 
         function saveEditedWaypoint() {
             if (!editingWaypointId) return;
-            if (!selectedPlace || !selectedPlace.geometry) { alert("請從建議清單中選擇一個有效的新地點才能儲存！"); return; }
+            
+            if (!selectedPlace || !selectedPlace.geometry) {
+                alert("請從建議清單中選擇一個有效的新地點才能儲存！");
+                return;
+            }
+
             const index = waypoints.findIndex(wp => wp.id === editingWaypointId);
+
             if (index !== -1) {
                 waypoints[index].name = selectedPlace.name || selectedPlace.formatted_address;
                 waypoints[index].location = selectedPlace.geometry.location;
+                
                 editingWaypointId = null;
+                
                 cancelEdit(); 
-                saveWaypoints(); calculateRoute(); // 修正：儲存後也重新計算路線
+                
+                saveWaypoints();
+                updateWaypointsList();
+                calculateRoute();
             }
         }
 
@@ -217,11 +303,15 @@
             
             document.querySelector('#controls h3').innerHTML = `📍 行程站點 (共 ${waypoints.length} 點)`;
             
-            if (waypoints.length === 0) { listContainer.innerHTML = '<p id="list-placeholder">目前沒有任何地點。</p>'; return; }
+            if (waypoints.length === 0) {
+                listContainer.innerHTML = '<p id="list-placeholder">目前沒有任何地點。</p>';
+                return;
+            }
 
             waypoints.forEach((wp, index) => {
                 const item = document.createElement('div');
                 item.className = 'waypoint-item';
+                
                 const isEditing = wp.id === editingWaypointId;
 
                 item.innerHTML = `
@@ -249,7 +339,7 @@
 
 
         // =================================================================
-        // 路徑計算與繪製 (新增排序邏輯)
+        // 路徑計算與繪製
         // =================================================================
 
         function calculateRoute() {
@@ -282,39 +372,11 @@
 
             directionsService.route(request, (response, status) => {
                 if (status === 'OK') {
-                    const route = response.routes[0];
-                    
-                    // **********************************************
-                    // *** 關鍵優化：根據 API 結果重新排序 Waypoints 陣列 ***
-                    // **********************************************
-                    const originalMiddleWaypoints = waypoints.slice(1, waypoints.length - 1);
-                    const optimizedOrder = route.waypoint_order;
-                    
-                    let sortedMiddleWaypoints = [];
-                    // 1. 根據優化後的索引順序來排列中間點
-                    optimizedOrder.forEach(index => {
-                        sortedMiddleWaypoints.push(originalMiddleWaypoints[index]);
-                    });
-                    
-                    // 2. 重建新的 waypoints 陣列 (起點 + 排序後的中間點 + 終點)
-                    const newWaypoints = [
-                        waypoints[0], 
-                        ...sortedMiddleWaypoints,
-                        waypoints[waypoints.length - 1] 
-                    ];
-                    
-                    // 3. 更新全域 waypoints 陣列，並更新列表顯示
-                    waypoints = newWaypoints;
-                    updateWaypointsList();
-                    
-                    // 4. 繪製優化後的路線
                     directionsRenderer.setDirections(response);
-                    
-                    // **********************************************
-                    // *** 計算總距離和總時間 ***
-                    // **********************************************
+
                     let totalDistance = 0;
                     let totalDuration = 0;
+                    const route = response.routes[0];
 
                     route.legs.forEach(leg => {
                         totalDistance += leg.distance.value; 
