@@ -6,12 +6,14 @@
     <meta charset="utf-8">
     
     <style>
+        /* 確保 body 和 html 佔滿整個視窗 */
         body, html {
             margin: 0;
             padding: 0;
             font-family: Arial, sans-serif;
             height: 100%;
         }
+        /* 核心結構：使用 Flexbox 劃分控制面板和地圖 */
         #container {
             display: flex;
             height: 100vh; /* 確保容器佔滿整個視窗高度 */
@@ -81,13 +83,24 @@
     </script>
     
     <script>
+        // 全域變數
         let map, directionsService, directionsRenderer, autocomplete;
         let waypoints = [], waypointIdCounter = 0, selectedPlace = null, editingWaypointId = null;
 
+        // =================================================================
+        // 核心功能：初始化與資料管理
+        // =================================================================
+        
         function initMap() {
             const taiwan = { lat: 23.6978, lng: 120.9605 }; 
-            map = new google.maps.Map(document.getElementById('map'), { zoom: 8, center: taiwan });
+            
+            map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 8,
+                center: taiwan,
+            });
+
             directionsService = new google.maps.DirectionsService();
+            // 允許使用者拖曳地圖上的路線
             directionsRenderer = new google.maps.DirectionsRenderer({ map: map, suppressMarkers: false, draggable: true });
             
             directionsRenderer.addListener("directions_changed", () => { console.log("路線已被拖曳改變。"); });
@@ -109,8 +122,15 @@
                 
                 if (savedWaypoints) {
                     const loadedData = JSON.parse(savedWaypoints);
-                    waypoints = loadedData.map(wp => ({ id: wp.id, name: wp.name, location: new google.maps.LatLng(wp.location.lat, wp.location.lng) }));
+                    
+                    waypoints = loadedData.map(wp => ({
+                        id: wp.id,
+                        name: wp.name,
+                        location: new google.maps.LatLng(wp.location.lat, wp.location.lng) 
+                    }));
+                    
                     if (savedIdCounter) { waypointIdCounter = parseInt(savedIdCounter) + 1; }
+
                     updateWaypointsList();
                     calculateRoute(); 
                 }
@@ -119,19 +139,38 @@
         
         function saveWaypoints() {
             try {
-                const dataToSave = waypoints.map(wp => ({ id: wp.id, name: wp.name, location: { lat: wp.location.lat(), lng: wp.location.lng() } }));
+                const dataToSave = waypoints.map(wp => ({
+                    id: wp.id,
+                    name: wp.name,
+                    location: { lat: wp.location.lat(), lng: wp.location.lng() }
+                }));
+
                 localStorage.setItem('plannerWaypoints', JSON.stringify(dataToSave));
                 localStorage.setItem('plannerIdCounter', waypointIdCounter.toString());
             } catch (e) { console.error("無法儲存到 Local Storage:", e); }
         }
 
+        // =================================================================
+        // 增/刪/編輯功能
+        // =================================================================
+
         function addWaypoint() {
             if (!selectedPlace || !selectedPlace.geometry) { alert("請從建議清單中選擇一個有效地點！"); return; }
-            const newWaypoint = { id: waypointIdCounter++, name: selectedPlace.name || selectedPlace.formatted_address, location: selectedPlace.geometry.location };
+            
+            const newWaypoint = {
+                id: waypointIdCounter++,
+                name: selectedPlace.name || selectedPlace.formatted_address,
+                location: selectedPlace.geometry.location
+            };
+
             waypoints.push(newWaypoint);
+            
             document.getElementById('place-input').value = '';
             selectedPlace = null;
-            saveWaypoints(); updateWaypointsList(); calculateRoute();
+
+            saveWaypoints();
+            // 修正：先計算路線，讓路線優化後再更新列表
+            calculateRoute(); 
         }
 
         function deleteWaypoint(id) {
@@ -168,20 +207,23 @@
                 waypoints[index].location = selectedPlace.geometry.location;
                 editingWaypointId = null;
                 cancelEdit(); 
-                saveWaypoints(); updateWaypointsList(); calculateRoute();
+                saveWaypoints(); calculateRoute(); // 修正：儲存後也重新計算路線
             }
         }
 
         function updateWaypointsList() {
             const listContainer = document.getElementById('waypoints-list');
             listContainer.innerHTML = '';
+            
             document.querySelector('#controls h3').innerHTML = `📍 行程站點 (共 ${waypoints.length} 點)`;
+            
             if (waypoints.length === 0) { listContainer.innerHTML = '<p id="list-placeholder">目前沒有任何地點。</p>'; return; }
 
             waypoints.forEach((wp, index) => {
                 const item = document.createElement('div');
                 item.className = 'waypoint-item';
                 const isEditing = wp.id === editingWaypointId;
+
                 item.innerHTML = `
                     <span>**${index + 1}.** ${wp.name}</span>
                     <div>
@@ -200,58 +242,4 @@
                         </div>
                      `;
                      item.insertAdjacentHTML('afterend', editInputHtml);
-                     document.getElementById('edit-place-input').value = wp.name; 
-                }
-            });
-        }
-
-        function calculateRoute() {
-            if (waypoints.length < 2) {
-                directionsRenderer.setDirections({ routes: [] });
-                document.getElementById('total-distance').textContent = 'N/A';
-                document.getElementById('total-duration').textContent = 'N/A';
-                return;
-            }
-
-            const origin = waypoints[0].location;
-            const destination = waypoints[waypoints.length - 1].location;
-            const middleWaypoints = waypoints.slice(1, waypoints.length - 1).map(wp => ({ location: wp.location, stopover: true }));
-            
-            const request = {
-                origin: origin,
-                destination: destination,
-                waypoints: middleWaypoints,
-                optimizeWaypoints: true,
-                travelMode: google.maps.TravelMode[document.getElementById('travel-mode').value]
-            };
-
-            directionsService.route(request, (response, status) => {
-                if (status === 'OK') {
-                    directionsRenderer.setDirections(response);
-                    let totalDistance = 0;
-                    let totalDuration = 0;
-                    const route = response.routes[0];
-
-                    route.legs.forEach(leg => { totalDistance += leg.distance.value; totalDuration += leg.duration.value; });
-                    
-                    document.getElementById('total-distance').textContent = (totalDistance / 1000).toFixed(2) + ' 公里';
-                    document.getElementById('total-duration').textContent = formatDuration(totalDuration);
-                } else {
-                    directionsRenderer.setDirections({ routes: [] });
-                    document.getElementById('total-distance').textContent = '路線規劃失敗';
-                    document.getElementById('total-duration').textContent = `錯誤: ${status}`;
-                }
-            });
-        }
-        
-        function formatDuration(seconds) {
-            const hours = Math.floor(seconds / 3600);
-            const minutes = Math.floor((seconds % 3600) / 60);
-            let result = '';
-            if (hours > 0) result += hours + ' 小時 ';
-            if (minutes > 0) result += minutes + ' 分鐘';
-            return result.trim() || '少於 1 分鐘';
-        }
-    </script>
-</body>
-</html>
+                     document.getElementById('edit-place-input
