@@ -242,4 +242,105 @@
                         </div>
                      `;
                      item.insertAdjacentHTML('afterend', editInputHtml);
-                     document.getElementById('edit-place-input
+                     document.getElementById('edit-place-input').value = wp.name; 
+                }
+            });
+        }
+
+
+        // =================================================================
+        // 路徑計算與繪製 (新增排序邏輯)
+        // =================================================================
+
+        function calculateRoute() {
+            if (waypoints.length < 2) {
+                directionsRenderer.setDirections({ routes: [] });
+                document.getElementById('total-distance').textContent = 'N/A';
+                document.getElementById('total-duration').textContent = 'N/A';
+                return;
+            }
+
+            const origin = waypoints[0].location;
+            const destination = waypoints[waypoints.length - 1].location;
+            
+            // 將中間點轉換為 Directions 服務所需的格式
+            const middleWaypoints = waypoints.slice(1, waypoints.length - 1).map(wp => ({
+                location: wp.location,
+                stopover: true 
+            }));
+            
+            const selectedMode = document.getElementById('travel-mode').value;
+            const travelMode = google.maps.TravelMode[selectedMode]; 
+
+            const request = {
+                origin: origin,
+                destination: destination,
+                waypoints: middleWaypoints,
+                optimizeWaypoints: true, // 讓 Google 自動優化中途點的順序
+                travelMode: travelMode
+            };
+
+            directionsService.route(request, (response, status) => {
+                if (status === 'OK') {
+                    const route = response.routes[0];
+                    
+                    // **********************************************
+                    // *** 關鍵優化：根據 API 結果重新排序 Waypoints 陣列 ***
+                    // **********************************************
+                    const originalMiddleWaypoints = waypoints.slice(1, waypoints.length - 1);
+                    const optimizedOrder = route.waypoint_order;
+                    
+                    let sortedMiddleWaypoints = [];
+                    // 1. 根據優化後的索引順序來排列中間點
+                    optimizedOrder.forEach(index => {
+                        sortedMiddleWaypoints.push(originalMiddleWaypoints[index]);
+                    });
+                    
+                    // 2. 重建新的 waypoints 陣列 (起點 + 排序後的中間點 + 終點)
+                    const newWaypoints = [
+                        waypoints[0], 
+                        ...sortedMiddleWaypoints,
+                        waypoints[waypoints.length - 1] 
+                    ];
+                    
+                    // 3. 更新全域 waypoints 陣列，並更新列表顯示
+                    waypoints = newWaypoints;
+                    updateWaypointsList();
+                    
+                    // 4. 繪製優化後的路線
+                    directionsRenderer.setDirections(response);
+                    
+                    // **********************************************
+                    // *** 計算總距離和總時間 ***
+                    // **********************************************
+                    let totalDistance = 0;
+                    let totalDuration = 0;
+
+                    route.legs.forEach(leg => {
+                        totalDistance += leg.distance.value; 
+                        totalDuration += leg.duration.value;
+                    });
+                    
+                    document.getElementById('total-distance').textContent = (totalDistance / 1000).toFixed(2) + ' 公里';
+                    document.getElementById('total-duration').textContent = formatDuration(totalDuration);
+
+                } else {
+                    directionsRenderer.setDirections({ routes: [] });
+                    document.getElementById('total-distance').textContent = '路線規劃失敗';
+                    document.getElementById('total-duration').textContent = `錯誤: ${status}`;
+                }
+            });
+        }
+        
+        function formatDuration(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            let result = '';
+            if (hours > 0) result += hours + ' 小時 ';
+            if (minutes > 0) result += minutes + ' 分鐘';
+            return result.trim() || '少於 1 分鐘';
+        }
+
+    </script>
+</body>
+</html>
